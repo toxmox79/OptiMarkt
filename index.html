@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>eBay Marktoptimierer Begleitapp</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="page-shell">
+      <section class="hero-card">
+        <div>
+          <p class="eyebrow">Begleitapp</p>
+          <h1>Marktoptimierer als eigenstaendige Webapp</h1>
+          <p class="hero-copy">
+            Diese Version arbeitet nur mit einer exportierten
+            <code>marktoptimierer-shared.json</code> aus der Haupt-App. Keine API, keine
+            Datenbank, keine Plenty- oder eBay-Anbindung.
+          </p>
+        </div>
+        <div class="hero-actions">
+          <label class="primary-button">
+            JSON laden
+            <input id="json-file-input" accept=".json,application/json" class="hidden-input" type="file" />
+          </label>
+          <button id="clear-file-button" class="secondary-button" type="button">Datei entfernen</button>
+        </div>
+        <p id="status-message" class="status-message">Bitte eine exportierte JSON-Datei laden.</p>
+      </section>
+
+      <section id="dashboard-root" class="dashboard-root hidden">
+        <section class="tab-bar">
+          <button class="tab-button is-active" data-tab="overview" type="button">Uebersicht</button>
+          <button class="tab-button" data-tab="changes" type="button">Aenderungen</button>
+        </section>
+
+        <section id="overview-panel" class="tab-panel">
+          <div id="kpi-grid" class="kpi-grid"></div>
+
+          <section class="panel">
+            <div class="filters-grid">
+              <input id="search-input" class="field" placeholder="Suche nach Plenty ItemID, SKU, EAN, Titel" />
+              <select id="traffic-filter" class="field">
+                <option value="ALL">Alle Ampeln</option>
+                <option value="GREEN">Gruen</option>
+                <option value="YELLOW">Gelb</option>
+                <option value="RED">Rot</option>
+                <option value="GREY">Grau</option>
+                <option value="BLUE">Blau</option>
+              </select>
+              <select id="category-filter" class="field">
+                <option value="ALL">Alle Kategorien</option>
+              </select>
+              <select id="sort-field" class="field">
+                <option value="revenue30d">Sortierung: Umsatz</option>
+                <option value="sales30d">Sortierung: Verkaeufe</option>
+                <option value="priceDifferencePercent">Sortierung: Preisabweichung</option>
+                <option value="daysSinceLastSale">Sortierung: Tage seit letztem Verkauf</option>
+                <option value="stockNet">Sortierung: Bestand</option>
+                <option value="title">Sortierung: Titel</option>
+              </select>
+            </div>
+
+            <div class="filters-row">
+              <label><input id="stock-only" type="checkbox" /> Nur Bestand &gt; 0</label>
+              <label><input id="without-ean" type="checkbox" /> Ohne EAN</label>
+              <label><input id="zero-sales" type="checkbox" /> Verkaeufe = 0</label>
+              <label><input id="show-inactive" type="checkbox" /> Inaktive Artikel anzeigen</label>
+              <select id="price-deviation" class="pill-field">
+                <option value="ALL">Alle Preisabweichungen</option>
+                <option value="GT5">&gt; 5 %</option>
+                <option value="GT10">&gt; 10 %</option>
+              </select>
+            </div>
+
+            <p id="overview-count" class="muted-text"></p>
+
+            <div class="table-scroll">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Ampel</th>
+                    <th>Artikel</th>
+                    <th>Status</th>
+                    <th>Bestand</th>
+                    <th>Eigener Preis</th>
+                    <th>EK netto</th>
+                    <th>eBay Preis</th>
+                    <th>Idealo Preis</th>
+                    <th>Quelle</th>
+                    <th>Verkaeufer</th>
+                    <th>Versand</th>
+                    <th>eBay Gewinn</th>
+                    <th>Diff.</th>
+                    <th>Sales 7d</th>
+                    <th>Sales 30d</th>
+                    <th>Umsatz 30d</th>
+                    <th>Tage seit Sale</th>
+                    <th>Empfehlung</th>
+                  </tr>
+                </thead>
+                <tbody id="overview-body"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section id="changes-panel" class="tab-panel hidden">
+          <div id="changes-kpis" class="kpi-grid"></div>
+
+          <section class="panel">
+            <div class="section-header">
+              <div>
+                <h2>Preis- und Titel-Aenderungen mit Wirkung</h2>
+                <p>
+                  Vergleich der Performance vor und nach der letzten Preis- oder
+                  Titel-Aenderung mit klarer Handlungsempfehlung.
+                </p>
+              </div>
+            </div>
+
+            <div class="table-scroll">
+              <table class="data-table changes-table">
+                <thead>
+                  <tr>
+                    <th>Artikel</th>
+                    <th>Aenderung</th>
+                    <th>Vorher / Nachher</th>
+                    <th>Fenster</th>
+                    <th>Sales/Tag</th>
+                    <th>Umsatz/Tag</th>
+                    <th>Ergebnis</th>
+                    <th>Empfehlung</th>
+                  </tr>
+                </thead>
+                <tbody id="changes-body"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
