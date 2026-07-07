@@ -4,6 +4,14 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>eBay Marktoptimierer Begleitapp</title>
+    <meta
+      name="description"
+      content="Eigenstaendige Begleitapp fuer den eBay Marktoptimierer mit Upload einer exportierten JSON-Datei."
+    />
+    <meta name="theme-color" content="#0f172a" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="shortcut icon" href="./favicon.svg" />
+    <link rel="manifest" href="./site.webmanifest" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -74,9 +82,32 @@
             </div>
 
             <p id="overview-count" class="muted-text"></p>
+            <p class="scroll-hint">
+              Falls rechts noch Spalten fehlen, bitte im Tabellenbereich horizontal scrollen.
+            </p>
 
             <div class="table-scroll">
               <table class="data-table">
+                <colgroup>
+                  <col class="col-badge" />
+                  <col class="col-product" />
+                  <col class="col-status" />
+                  <col class="col-stock" />
+                  <col class="col-price" />
+                  <col class="col-price" />
+                  <col class="col-price" />
+                  <col class="col-price-wide" />
+                  <col class="col-source" />
+                  <col class="col-seller" />
+                  <col class="col-shipping" />
+                  <col class="col-profit" />
+                  <col class="col-diff" />
+                  <col class="col-sales" />
+                  <col class="col-sales" />
+                  <col class="col-revenue" />
+                  <col class="col-days" />
+                  <col class="col-recommendation" />
+                </colgroup>
                 <thead>
                   <tr>
                     <th>Ampel</th>
@@ -121,6 +152,16 @@
 
             <div class="table-scroll">
               <table class="data-table changes-table">
+                <colgroup>
+                  <col class="change-col-product" />
+                  <col class="change-col-type" />
+                  <col class="change-col-values" />
+                  <col class="change-col-window" />
+                  <col class="change-col-sales" />
+                  <col class="change-col-revenue" />
+                  <col class="change-col-result" />
+                  <col class="change-col-recommendation" />
+                </colgroup>
                 <thead>
                   <tr>
                     <th>Artikel</th>

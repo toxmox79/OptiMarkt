@@ -7,6 +7,7 @@ Dieser Ordner enthaelt die GitHub-taugliche Webapp fuer den eBay Marktoptimierer
 - `index.html`: Einstiegspunkt
 - `styles.css`: Layout und Styling
 - `app.js`: Logik fuer Upload, Filter, KPIs, Tabellen und Aenderungsansicht
+- `favicon.svg` plus `site.webmanifest`: vorbereitete Icons fuer GitHub Pages / Browser-Tab
 
 ### Verwendung
 

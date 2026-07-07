@@ -254,37 +254,48 @@ select {
   font-size: 14px;
 }
 
+.scroll-hint {
+  margin: 10px 0 0;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
 .table-scroll {
   margin-top: 18px;
   overflow-x: auto;
   padding-bottom: 8px;
+  scrollbar-gutter: stable both-edges;
 }
 
 .data-table {
   width: 100%;
-  min-width: 1640px;
+  min-width: 1700px;
+  table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0 14px;
 }
 
 .changes-table {
-  min-width: 1380px;
+  min-width: 1280px;
 }
 
 .data-table th {
   text-align: left;
-  padding: 0 12px 10px;
+  padding: 0 8px 10px;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
 }
 
 .data-row td {
-  padding: 16px 12px;
+  padding: 14px 8px;
   vertical-align: top;
   background: rgba(255, 255, 255, 0.95);
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
+  font-size: 14px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .data-row td:first-child {
@@ -300,7 +311,7 @@ select {
 }
 
 .badge-stack {
-  min-width: 88px;
+  min-width: 84px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -350,7 +361,7 @@ select {
 }
 
 .item-id-button {
-  padding: 7px 10px;
+  padding: 6px 8px;
   background: #f8fafc;
   border-color: var(--border);
   color: #475569;
@@ -359,7 +370,7 @@ select {
 }
 
 .product-cell {
-  min-width: 420px;
+  min-width: 0;
 }
 
 .product-layout,
@@ -398,7 +409,7 @@ select {
 .product-title,
 .change-title {
   margin: 0;
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 700;
   line-height: 1.35;
 }
@@ -417,10 +428,10 @@ select {
 .product-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 14px;
+  gap: 6px 10px;
   margin-top: 8px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .product-meta strong {
@@ -469,6 +480,104 @@ select {
   display: flex;
   justify-content: space-between;
   gap: 16px;
+}
+
+.data-table a {
+  color: #6d28d9;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.col-badge {
+  width: 110px;
+}
+
+.col-product {
+  width: 280px;
+}
+
+.col-status {
+  width: 76px;
+}
+
+.col-stock {
+  width: 72px;
+}
+
+.col-price {
+  width: 88px;
+}
+
+.col-price-wide {
+  width: 96px;
+}
+
+.col-source {
+  width: 78px;
+}
+
+.col-seller {
+  width: 102px;
+}
+
+.col-shipping {
+  width: 82px;
+}
+
+.col-profit {
+  width: 94px;
+}
+
+.col-diff {
+  width: 84px;
+}
+
+.col-sales {
+  width: 66px;
+}
+
+.col-revenue {
+  width: 92px;
+}
+
+.col-days {
+  width: 78px;
+}
+
+.col-recommendation {
+  width: 135px;
+}
+
+.change-col-product {
+  width: 280px;
+}
+
+.change-col-type {
+  width: 100px;
+}
+
+.change-col-values {
+  width: 260px;
+}
+
+.change-col-window {
+  width: 110px;
+}
+
+.change-col-sales {
+  width: 140px;
+}
+
+.change-col-revenue {
+  width: 170px;
+}
+
+.change-col-result {
+  width: 110px;
+}
+
+.change-col-recommendation {
+  width: 270px;
 }
 
 .empty-state {
