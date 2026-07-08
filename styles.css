@@ -421,6 +421,10 @@ select {
   color: var(--muted);
 }
 
+.product-trend-line {
+  margin-top: 8px;
+}
+
 .product-category {
   color: #94a3b8;
 }
@@ -442,6 +446,36 @@ select {
   color: #b45309;
   font-size: 13px;
   font-weight: 600;
+}
+
+.trend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.trend-chip.up {
+  background: var(--emerald-soft);
+  color: var(--emerald);
+}
+
+.trend-chip.down {
+  background: var(--rose-soft);
+  color: var(--rose);
+}
+
+.trend-chip.stable {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.trend-chip.none {
+  background: #e2e8f0;
+  color: #475569;
 }
 
 .status-pill,
@@ -600,6 +634,51 @@ select {
 }
 
 .change-result.neutral {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.listing-refresh-box {
+  margin-top: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #f8fafc;
+  padding: 10px 12px;
+}
+
+.listing-refresh-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.listing-refresh-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.listing-refresh-chip.positive {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.listing-refresh-chip.negative {
+  background: #ffe4e6;
+  color: #be123c;
+}
+
+.listing-refresh-chip.too-early {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.listing-refresh-chip.neutral {
   background: #e2e8f0;
   color: #475569;
 }

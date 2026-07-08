@@ -11,6 +11,7 @@ const state = {
   onlyStock: false,
   onlyWithoutEan: false,
   onlyZeroSales: false,
+  excludeBWare: false,
   showInactive: false
 };
 
@@ -32,6 +33,7 @@ const elements = {
   stockOnly: document.getElementById("stock-only"),
   withoutEan: document.getElementById("without-ean"),
   zeroSales: document.getElementById("zero-sales"),
+  excludeBware: document.getElementById("exclude-bware"),
   showInactive: document.getElementById("show-inactive"),
   overviewCount: document.getElementById("overview-count"),
   overviewBody: document.getElementById("overview-body"),
@@ -87,6 +89,10 @@ function wireEvents() {
   });
   elements.zeroSales.addEventListener("change", (event) => {
     state.onlyZeroSales = event.target.checked;
+    render();
+  });
+  elements.excludeBware.addEventListener("change", (event) => {
+    state.excludeBWare = event.target.checked;
     render();
   });
   elements.showInactive.addEventListener("change", (event) => {
@@ -209,6 +215,9 @@ function renderOverview() {
         return false;
       }
       if (state.onlyZeroSales && product.sales30d !== 0) {
+        return false;
+      }
+      if (state.excludeBWare && isBWareProduct(product)) {
         return false;
       }
       if (state.priceDeviation === "GT5" && (product.priceDifferencePercent ?? 0) <= 5) {
@@ -379,6 +388,17 @@ function createOverviewRow(product) {
         <div>
           <p class="product-title">${escapeHtml(product.title)}</p>
           <p class="product-line">${escapeHtml(product.sku ?? "ohne SKU")} | ${escapeHtml(product.ean ?? "ohne EAN")}</p>
+          <p class="product-trend-line">
+            <span class="trend-chip ${trendChipClassName(product.salesVelocity?.trendDirection)}">
+              <span aria-hidden="true">${escapeHtml(trendArrow(product.salesVelocity?.trendDirection))}</span>
+              <span>${escapeHtml(trendLabel(product.salesVelocity?.trendDirection))}</span>
+              ${
+                product.salesVelocity?.growthPercent != null
+                  ? `<span>(${escapeHtml(formatPercent(product.salesVelocity.growthPercent))})</span>`
+                  : ""
+              }
+            </span>
+          </p>
           <p class="product-line product-category">${escapeHtml(product.categoryName ?? "ohne Kategorie")}</p>
           <div class="product-meta">
             <span>${escapeHtml(formatLogistics(product))}</span>
@@ -417,7 +437,20 @@ function createOverviewRow(product) {
     <td>${escapeHtml(formatInteger(product.sales30d))}</td>
     <td>${escapeHtml(formatCurrency(product.revenue30d))}</td>
     <td>${escapeHtml(formatInteger(product.daysSinceLastSale))}</td>
-    <td>${escapeHtml(product.recommendation ?? "")}</td>
+    <td>
+      <div>${escapeHtml(product.recommendation ?? "")}</div>
+      <div class="listing-refresh-box">
+        <div class="listing-refresh-head">
+          <span class="listing-refresh-chip ${listingRefreshClassName(product.listingRefreshInsight?.status)}">${escapeHtml(product.listingRefreshInsight?.label ?? "Relist unklar")}</span>
+          ${
+            product.listingRefreshInsight?.listingAgeDays != null
+              ? `<span class="subtle">${escapeHtml(formatInteger(product.listingRefreshInsight.listingAgeDays))} Tage online</span>`
+              : ""
+          }
+        </div>
+        <div class="subtle">${escapeHtml(product.listingRefreshInsight?.shortReason ?? "Keine belastbare Aussage moeglich.")}</div>
+      </div>
+    </td>
   `;
 
   for (const button of row.querySelectorAll("[data-copy-item-id]")) {
@@ -451,7 +484,7 @@ function createChangeRow(entry) {
       </div>
     </td>
     <td>
-      <div><strong>${entry.changeType === "PRICE" ? "Preis" : "Titel"}</strong></div>
+      <div><strong>${escapeHtml(changeTypeLabel(entry.changeType))}</strong></div>
       <div class="subtle">${escapeHtml(formatDate(entry.changedAt))}</div>
     </td>
     <td>
@@ -586,12 +619,44 @@ function formatLogistics(product) {
   return `${Number(product.weightKg).toFixed(2)} kg | ${Number(product.lengthCm).toFixed(0)} x ${Number(product.widthCm).toFixed(0)} x ${Number(product.heightCm).toFixed(0)} cm`;
 }
 
+function isBWareProduct(product) {
+  const titleCandidates = [product.ebayTitle, product.title]
+    .map((value) => value?.trim())
+    .filter(Boolean);
+
+  return titleCandidates.some((value) => /[()]/.test(value));
+}
+
 function formatPriceChangeLabel(changedAt, previousValue, currentValue) {
   if (!changedAt || previousValue == null || currentValue == null) {
     return null;
   }
 
   return `${formatDate(changedAt)} ${formatCurrency(previousValue)} -> ${formatCurrency(currentValue)}`;
+}
+
+function listingRefreshClassName(value) {
+  switch (value) {
+    case "RELIST":
+      return "negative";
+    case "WATCH":
+      return "too-early";
+    case "OK":
+      return "positive";
+    default:
+      return "neutral";
+  }
+}
+
+function changeTypeLabel(value) {
+  switch (value) {
+    case "PRICE":
+      return "Preis";
+    case "LISTING":
+      return "Listing-ID";
+    default:
+      return "eBay Titel";
+  }
 }
 
 function profitStatusLabel(status) {
@@ -643,6 +708,49 @@ function changeOutcomeClassName(outcome) {
       return "too-early";
     default:
       return "neutral";
+  }
+}
+
+function trendLabel(value) {
+  switch (value) {
+    case "UP":
+      return "Trend steigend";
+    case "DOWN":
+      return "Trend fallend";
+    case "STABLE":
+      return "Trend stabil";
+    case "NEW":
+      return "Trend neu";
+    default:
+      return "Kein Trend";
+  }
+}
+
+function trendChipClassName(value) {
+  switch (value) {
+    case "UP":
+    case "NEW":
+      return "up";
+    case "DOWN":
+      return "down";
+    case "STABLE":
+      return "stable";
+    default:
+      return "none";
+  }
+}
+
+function trendArrow(value) {
+  switch (value) {
+    case "UP":
+    case "NEW":
+      return "▲";
+    case "DOWN":
+      return "▼";
+    case "STABLE":
+      return "▶";
+    default:
+      return "•";
   }
 }
 
