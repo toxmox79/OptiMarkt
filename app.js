@@ -232,7 +232,7 @@ function renderOverview() {
         return true;
       }
 
-      return [product.title, product.sku, product.ean, product.plentyItemId]
+      return [product.title, product.sku, product.ean, product.plentyItemId, product.ebayListingId]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(normalizedSearch));
     })
@@ -441,14 +441,25 @@ function createOverviewRow(product) {
       <div>${escapeHtml(product.recommendation ?? "")}</div>
       <div class="listing-refresh-box">
         <div class="listing-refresh-head">
-          <span class="listing-refresh-chip ${listingRefreshClassName(product.listingRefreshInsight?.status)}">${escapeHtml(product.listingRefreshInsight?.label ?? "Relist unklar")}</span>
+          <span class="listing-refresh-chip ${listingActivityClassName(product.listingRefreshInsight?.activity?.status)}">${escapeHtml(product.listingRefreshInsight?.activity?.label ?? "Verkaufsaktivitaet unklar")}</span>
+          ${
+            product.listingRefreshInsight?.activity?.score != null
+              ? `<span class="subtle score-pill">Score ${escapeHtml(formatInteger(product.listingRefreshInsight.activity.score))}/100</span>`
+              : ""
+          }
+        </div>
+        <div class="subtle">${escapeHtml(product.listingRefreshInsight?.activity?.shortReason ?? "Keine belastbare Aktivitaetsbewertung moeglich.")}</div>
+      </div>
+      <div class="listing-refresh-box">
+        <div class="listing-refresh-head">
+          <span class="listing-refresh-chip ${listingRelistClassName(product.listingRefreshInsight?.relist?.status)}">${escapeHtml(product.listingRefreshInsight?.relist?.label ?? "Relist unklar")}</span>
           ${
             product.listingRefreshInsight?.listingAgeDays != null
               ? `<span class="subtle">${escapeHtml(formatInteger(product.listingRefreshInsight.listingAgeDays))} Tage online</span>`
               : ""
           }
         </div>
-        <div class="subtle">${escapeHtml(product.listingRefreshInsight?.shortReason ?? "Keine belastbare Aussage moeglich.")}</div>
+        <div class="subtle">${escapeHtml(product.listingRefreshInsight?.relist?.shortReason ?? "Keine belastbare Relist-Aussage moeglich.")}</div>
       </div>
     </td>
   `;
@@ -603,6 +614,15 @@ function buildCompactMetaItems(product) {
     items.push({ label: "EK:", value: purchasePriceChange });
   }
 
+  const listingIdChange = formatListingIdChangeLabel(
+    product.lastListingIdChangeAt,
+    product.lastListingIdPrevious,
+    product.ebayListingId
+  );
+  if (listingIdChange) {
+    items.push({ label: "Listing:", value: listingIdChange });
+  }
+
   return items;
 }
 
@@ -635,7 +655,32 @@ function formatPriceChangeLabel(changedAt, previousValue, currentValue) {
   return `${formatDate(changedAt)} ${formatCurrency(previousValue)} -> ${formatCurrency(currentValue)}`;
 }
 
-function listingRefreshClassName(value) {
+function formatListingIdChangeLabel(changedAt, previousValue, currentValue) {
+  if (!changedAt || !previousValue || !currentValue) {
+    return null;
+  }
+
+  return `${formatDate(changedAt)} ${previousValue} -> ${currentValue}`;
+}
+
+function listingActivityClassName(value) {
+  switch (value) {
+    case "HIGH":
+      return "positive";
+    case "STABLE":
+      return "info";
+    case "DECLINING":
+      return "too-early";
+    case "LOW":
+      return "negative";
+    case "CRITICAL":
+      return "critical";
+    default:
+      return "neutral";
+  }
+}
+
+function listingRelistClassName(value) {
   switch (value) {
     case "RELIST":
       return "negative";

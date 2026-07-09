@@ -369,6 +369,12 @@ select {
   font-weight: 700;
 }
 
+.listing-id-button {
+  border-color: #99f6e4;
+  background: #f0fdfa;
+  color: #0f766e;
+}
+
 .product-cell {
   min-width: 0;
 }
@@ -419,6 +425,24 @@ select {
 .change-subline {
   margin-top: 6px;
   color: var(--muted);
+}
+
+.subtle-label {
+  color: #64748b;
+}
+
+.inline-copy-button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #0f766e;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.inline-copy-button:hover {
+  text-decoration: underline;
 }
 
 .product-trend-line {
@@ -673,14 +697,28 @@ select {
   color: #be123c;
 }
 
+.listing-refresh-chip.info {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
 .listing-refresh-chip.too-early {
   background: #fef3c7;
   color: #92400e;
 }
 
+.listing-refresh-chip.critical {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
 .listing-refresh-chip.neutral {
   background: #e2e8f0;
   color: #475569;
+}
+
+.score-pill {
+  font-weight: 700;
 }
 
 .change-result.too-early {
