@@ -4,6 +4,7 @@ const feeStorageKey = "marktoptimierer-fee-calculator-data";
 const state = {
   payload: null,
   feeCalculatorData: null,
+  selectedProductId: null,
   activeTab: "overview",
   search: "",
   trendFilter: "ALL",
@@ -25,6 +26,10 @@ const elements = {
   statusMessage: document.getElementById("status-message"),
   feeStatusMessage: document.getElementById("fee-status-message"),
   dashboardRoot: document.getElementById("dashboard-root"),
+  productModal: document.getElementById("product-modal"),
+  productModalBackdrop: document.getElementById("product-modal-backdrop"),
+  productModalClose: document.getElementById("product-modal-close"),
+  productModalContent: document.getElementById("product-modal-content"),
   tabButtons: Array.from(document.querySelectorAll("[data-tab]")),
   overviewPanel: document.getElementById("overview-panel"),
   changesPanel: document.getElementById("changes-panel"),
@@ -58,6 +63,8 @@ function wireEvents() {
   elements.feeFileInput.addEventListener("change", handleFeeFileUpload);
   elements.clearFileButton.addEventListener("click", clearPayload);
   elements.clearFeeFileButton.addEventListener("click", clearFeeCalculatorData);
+  elements.productModalBackdrop.addEventListener("click", closeProductModal);
+  elements.productModalClose.addEventListener("click", closeProductModal);
 
   for (const button of elements.tabButtons) {
     button.addEventListener("click", () => {
@@ -252,18 +259,17 @@ function render() {
     elements.overviewBody.innerHTML = "";
     elements.changesBody.innerHTML = "";
     elements.overviewCount.textContent = "";
+    elements.productModal.classList.add("hidden");
     return;
   }
 
   renderOverview();
   renderChanges();
+  renderProductModal();
 }
 
 function renderOverview() {
-  const products = applyFeeCalculatorOverrideToProducts(
-    state.payload.data.products,
-    state.feeCalculatorData
-  );
+  const products = getDisplayProducts();
   const baseProducts = products.filter((product) => state.showInactive || product.isActive);
   const inactiveCount = products.filter((product) => !product.isActive).length;
   const categories = Array.from(
@@ -486,7 +492,7 @@ function createOverviewRow(product) {
     </td>
     <td class="product-cell">
       <div class="product-layout">
-        <div class="product-image">
+        <div class="product-image" data-open-product="${escapeAttribute(product.id)}">
           ${
             product.imageUrl
               ? `<img alt="${escapeAttribute(product.title)}" src="${escapeAttribute(product.imageUrl)}" />`
@@ -525,26 +531,30 @@ function createOverviewRow(product) {
     <td>${escapeHtml(formatInteger(product.stockNet))}</td>
     <td>${escapeHtml(formatCurrency(product.currentPrice))}</td>
     <td>${escapeHtml(formatCurrency(product.purchasePriceNet))}</td>
-    <td>${renderLinkedPrice(product.ebayPrice, product.competitorSource === "EBAY" ? product.competitorUrl : null)}</td>
-    <td>${renderIdealoPrice(product)}</td>
+    <td>${renderProfit(product)}</td>
+    <td>
+      <div class="subtle-label">eBay</div>
+      <div>${renderLinkedPrice(product.ebayPrice, product.competitorSource === "EBAY" ? product.competitorUrl : null)}</div>
+      <div class="subtle-label" style="margin-top:8px;">Idealo</div>
+      <div>${renderIdealoPrice(product)}</div>
+      <div class="subtle" style="margin-top:8px;">Diff. ${escapeHtml(formatCurrency(product.priceDifferenceAbs))} | ${escapeHtml(formatPercent(product.priceDifferencePercent))}</div>
+    </td>
     <td>
       <div>${escapeHtml(product.competitorSource ?? "-")}</div>
       <div class="subtle">${renderLinkedPrice(product.competitorPrice, product.competitorUrl)}</div>
+      <div class="subtle" style="margin-top:8px;">Verkaeufer: ${escapeHtml(product.cheapestSeller ?? "-")}</div>
+      <div class="subtle">Versand: ${escapeHtml(product.shippingTariffName ?? "-")} | ${escapeHtml(formatCurrency(product.shippingCost))}</div>
     </td>
-    <td>${escapeHtml(product.cheapestSeller ?? "-")}</td>
     <td>
-      <div>${escapeHtml(product.shippingTariffName ?? "-")}</div>
-      <div class="subtle">${escapeHtml(formatCurrency(product.shippingCost))}</div>
+      <div><strong>7d:</strong> ${escapeHtml(formatInteger(product.sales7d))}</div>
+      <div><strong>30d:</strong> ${escapeHtml(formatInteger(product.sales30d))}</div>
+      <div><strong>Umsatz:</strong> ${escapeHtml(formatCurrency(product.revenue30d))}</div>
+      <div class="subtle">${
+        product.daysSinceLastSale == null
+          ? "Letzter Sale unbekannt"
+          : `Letzter Sale vor ${escapeHtml(formatInteger(product.daysSinceLastSale))} Tagen`
+      }</div>
     </td>
-    <td>${renderProfit(product)}</td>
-    <td>
-      <div>${escapeHtml(formatCurrency(product.priceDifferenceAbs))}</div>
-      <div class="subtle">${escapeHtml(formatPercent(product.priceDifferencePercent))}</div>
-    </td>
-    <td>${escapeHtml(formatInteger(product.sales7d))}</td>
-    <td>${escapeHtml(formatInteger(product.sales30d))}</td>
-    <td>${escapeHtml(formatCurrency(product.revenue30d))}</td>
-    <td>${escapeHtml(formatInteger(product.daysSinceLastSale))}</td>
     <td>
       <div>${escapeHtml(product.recommendation ?? "")}</div>
       <div class="listing-refresh-box">
@@ -584,7 +594,118 @@ function createOverviewRow(product) {
     });
   }
 
+  for (const trigger of row.querySelectorAll("[data-open-product]")) {
+    trigger.addEventListener("click", () => {
+      state.selectedProductId = trigger.dataset.openProduct;
+      renderProductModal();
+    });
+  }
+
   return row;
+}
+
+function closeProductModal() {
+  state.selectedProductId = null;
+  renderProductModal();
+}
+
+function renderProductModal() {
+  const product = getDisplayProducts().find((entry) => entry.id === state.selectedProductId) ?? null;
+
+  if (!product) {
+    elements.productModal.classList.add("hidden");
+    elements.productModalContent.innerHTML = "";
+    return;
+  }
+
+  elements.productModal.classList.remove("hidden");
+  elements.productModalContent.innerHTML = `
+    <div class="sheet-hero">
+      <div class="sheet-image">
+        ${product.imageUrl ? `<img alt="${escapeAttribute(product.title)}" src="${escapeAttribute(product.imageUrl)}" />` : ""}
+      </div>
+      <div>
+        <div class="sheet-badges">
+          ${renderTrafficLight(product.trafficLight)}
+          <span class="status-pill ${product.isActive ? "active" : "inactive"}">${product.isActive ? "aktiv" : "inaktiv"}</span>
+        </div>
+        <h2 class="sheet-title">${escapeHtml(product.title)}</h2>
+        <p class="sheet-subline">${escapeHtml(product.plentyItemId ?? "-")} | ${escapeHtml(product.sku ?? "ohne SKU")} | ${escapeHtml(product.ean ?? "ohne EAN")}</p>
+        <p class="sheet-subline">Listing-ID: ${escapeHtml(product.ebayListingId ?? "Noch keine Listing-ID gespeichert")}</p>
+        <p class="sheet-subline">eBay Titel: ${escapeHtml(product.ebayTitle ?? "Noch kein eBay Titel gespeichert")}</p>
+      </div>
+    </div>
+    <div class="sheet-grid">
+      <section class="sheet-panel">
+        <h3>Preis, Marge und Wettbewerb</h3>
+        <div class="sheet-metrics">
+          ${renderSheetMetric("Eigener Preis", formatCurrency(product.currentPrice))}
+          ${renderSheetMetric("EK netto", formatCurrency(product.purchasePriceNet))}
+          ${renderSheetMetric("eBay Preis", formatCurrency(product.ebayPrice))}
+          ${renderSheetMetric("Idealo Preis", formatCurrency(product.idealoPrice))}
+          ${renderSheetMetric("eBay Gewinn", product.ebayProfit == null ? profitStatusLabel(product.profitStatus) : formatCurrency(product.ebayProfit))}
+          ${renderSheetMetric("Versandtarif", escapeHtml(product.shippingTariffName ?? "-"))}
+          ${renderSheetMetric("Versandkosten", formatCurrency(product.shippingCost))}
+          ${renderSheetMetric("Preisabweichung", formatPercent(product.priceDifferencePercent))}
+        </div>
+      </section>
+      <section class="sheet-panel">
+        <h3>Produkt- und Logistikdaten</h3>
+        <div class="sheet-metrics">
+          ${renderSheetMetric("Kategorie", escapeHtml(product.categoryName ?? "-"))}
+          ${renderSheetMetric("Bestand netto", formatInteger(product.stockNet))}
+          ${renderSheetMetric("Gewicht", formatWeight(product.weightKg))}
+          ${renderSheetMetric("Masse", formatLogistics(product))}
+          ${renderSheetMetric("Listing Start", formatDate(product.listingStartAt))}
+          ${renderSheetMetric("Letzte Plenty-Aenderung", formatDate(product.listingUpdatedAt))}
+          ${renderSheetMetric("Letzte VK-Aenderung", escapeHtml(formatPriceChangeLabel(product.lastSalePriceChangeAt, product.lastSalePricePrevious, product.currentPrice) ?? "-"))}
+          ${renderSheetMetric("Letzte EK-Aenderung", escapeHtml(formatPriceChangeLabel(product.lastPurchasePriceChangeAt, product.lastPurchasePricePrevious, product.purchasePriceNet) ?? "-"))}
+          ${renderSheetMetric("Letzte Titel-Aenderung", escapeHtml(formatFullTitleChangeLabel(product.lastTitleChangeAt, product.lastTitlePrevious, product.ebayTitle) ?? "-"))}
+        </div>
+      </section>
+      <section class="sheet-panel">
+        <h3>Absatzanalyse</h3>
+        <div class="sheet-metrics">
+          ${renderSheetMetric("Verkaeufe letzte 24h", formatInteger(product.salesVelocity?.salesLast24h))}
+          ${renderSheetMetric("Verkaeufe letzte 7 Tage", formatInteger(product.salesVelocity?.salesLast7d))}
+          ${renderSheetMetric("Verkaeufe letzte 30 Tage", formatInteger(product.salesVelocity?.salesLast30d))}
+          ${renderSheetMetric("Trendrichtung", escapeHtml(trendLabel(product.salesVelocity?.trendDirection)))}
+          ${renderSheetMetric("Wachstum", formatPercent(product.salesVelocity?.growthPercent))}
+          ${renderSheetMetric("Forecast 30 Tage", product.salesVelocity?.forecast30d == null ? "-" : `${String(product.salesVelocity.forecast30d).replace(".", ",")}`)}
+        </div>
+      </section>
+      <section class="sheet-panel">
+        <h3>Empfehlung und Hinweise</h3>
+        <p>${escapeHtml(product.recommendation ?? "-")}</p>
+        <div class="listing-refresh-box">
+          <div class="listing-refresh-head">
+            <span class="listing-refresh-chip ${listingActivityClassName(product.listingRefreshInsight?.activity?.status)}">${escapeHtml(product.listingRefreshInsight?.activity?.label ?? "Verkaufsaktivitaet unklar")}</span>
+            ${
+              product.listingRefreshInsight?.activity?.score != null
+                ? `<span class="subtle score-pill">Score ${escapeHtml(formatInteger(product.listingRefreshInsight.activity.score))}/100</span>`
+                : ""
+            }
+          </div>
+          <div class="subtle">${escapeHtml(product.listingRefreshInsight?.activity?.reason ?? "-")}</div>
+        </div>
+        <div class="listing-refresh-box">
+          <div class="listing-refresh-head">
+            <span class="listing-refresh-chip ${listingRelistClassName(product.listingRefreshInsight?.relist?.status)}">${escapeHtml(product.listingRefreshInsight?.relist?.label ?? "Relist unklar")}</span>
+          </div>
+          <div class="subtle">${escapeHtml(product.listingRefreshInsight?.relist?.reason ?? "-")}</div>
+        </div>
+        ${product.note ? `<div class="sheet-note"><strong>Notiz:</strong> ${escapeHtml(product.note)}</div>` : ""}
+      </section>
+    </div>
+  `;
+}
+
+function renderSheetMetric(label, value) {
+  return `<div class="sheet-metric"><div class="sheet-metric-label">${label}</div><div class="sheet-metric-value">${value}</div></div>`;
+}
+
+function getDisplayProducts() {
+  return applyFeeCalculatorOverrideToProducts(state.payload?.data?.products ?? [], state.feeCalculatorData);
 }
 
 function createChangeRow(entry) {
@@ -1030,6 +1151,10 @@ function formatLogistics(product) {
   return `${Number(product.weightKg).toFixed(2)} kg | ${Number(product.lengthCm).toFixed(0)} x ${Number(product.widthCm).toFixed(0)} x ${Number(product.heightCm).toFixed(0)} cm`;
 }
 
+function formatWeight(value) {
+  return value == null ? "-" : `${Number(value).toFixed(2)} kg`;
+}
+
 function isBWareProduct(product) {
   const titleCandidates = [product.ebayTitle, product.title]
     .map((value) => value?.trim())
@@ -1044,6 +1169,14 @@ function formatPriceChangeLabel(changedAt, previousValue, currentValue) {
   }
 
   return `${formatDate(changedAt)} ${formatCurrency(previousValue)} -> ${formatCurrency(currentValue)}`;
+}
+
+function formatFullTitleChangeLabel(changedAt, previousValue, currentValue) {
+  if (!changedAt || !previousValue?.trim() || !currentValue?.trim()) {
+    return null;
+  }
+
+  return `${formatDate(changedAt)} | ${previousValue} -> ${currentValue}`;
 }
 
 function formatListingIdChangeLabel(changedAt, previousValue, currentValue) {

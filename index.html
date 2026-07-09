@@ -100,17 +100,10 @@
                   <col class="col-stock" />
                   <col class="col-price" />
                   <col class="col-price" />
-                  <col class="col-price" />
-                  <col class="col-price-wide" />
-                  <col class="col-source" />
-                  <col class="col-seller" />
-                  <col class="col-shipping" />
                   <col class="col-profit" />
-                  <col class="col-diff" />
-                  <col class="col-sales" />
-                  <col class="col-sales" />
-                  <col class="col-revenue" />
-                  <col class="col-days" />
+                  <col class="col-market" />
+                  <col class="col-market" />
+                  <col class="col-sales-compact" />
                   <col class="col-recommendation" />
                 </colgroup>
                 <thead>
@@ -121,17 +114,10 @@
                     <th>Bestand</th>
                     <th>Eigener Preis</th>
                     <th>EK netto</th>
-                    <th>eBay Preis</th>
-                    <th>Idealo Preis</th>
-                    <th>Quelle</th>
-                    <th>Verkaeufer</th>
-                    <th>Versand</th>
                     <th>eBay Gewinn</th>
-                    <th>Diff.</th>
-                    <th>Sales 7d</th>
-                    <th>Sales 30d</th>
-                    <th>Umsatz 30d</th>
-                    <th>Tage seit Sale</th>
+                    <th>Marktpreise</th>
+                    <th>Wettbewerb</th>
+                    <th>Absatz</th>
                     <th>Empfehlung</th>
                   </tr>
                 </thead>
@@ -192,6 +178,18 @@
         </section>
       </section>
     </main>
+
+    <div id="product-modal" class="product-modal hidden">
+      <div id="product-modal-backdrop" class="product-modal-backdrop"></div>
+      <div class="product-modal-shell">
+        <div class="product-modal-card">
+          <div class="product-modal-header">
+            <button id="product-modal-close" class="secondary-button" type="button">Schliessen</button>
+          </div>
+          <div id="product-modal-content" class="product-modal-content"></div>
+        </div>
+      </div>
+    </div>
 
     <script src="./app.js"></script>
   </body>
