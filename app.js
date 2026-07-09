@@ -648,6 +648,26 @@ function renderProductModal() {
           ${renderSheetMetric("Versandkosten", formatCurrency(product.shippingCost))}
           ${renderSheetMetric("Preisabweichung", formatPercent(product.priceDifferencePercent))}
         </div>
+        <div class="sheet-profit-preview">
+          <div class="sheet-profit-preview-head">
+            <div>
+              <p class="sheet-profit-preview-title">Gewinn mit Testpreis berechnen</p>
+              <p class="sheet-profit-preview-copy">
+                Testet alternativem Verkaufspreis inklusive eBay-Gebuehr, 2 % Werbung und Versand.
+              </p>
+            </div>
+            <div class="sheet-profit-preview-controls">
+              <label class="sheet-profit-input-wrap">
+                <span>Testpreis brutto</span>
+                <input class="field sheet-profit-input" data-profit-price-input type="text" value="${escapeAttribute(product.currentPrice.toFixed(2).replace(".", ","))}" />
+              </label>
+              <button class="primary-button" data-calc-profit type="button">Gewinn berechnen</button>
+            </div>
+          </div>
+          <div class="sheet-profit-results" data-profit-results>
+            ${renderSheetProfitPreview(product, null, null)}
+          </div>
+        </div>
       </section>
       <section class="sheet-panel">
         <h3>Produkt- und Logistikdaten</h3>
@@ -698,10 +718,112 @@ function renderProductModal() {
       </section>
     </div>
   `;
+
+  const calculateButton = elements.productModalContent.querySelector("[data-calc-profit]");
+  const priceInput = elements.productModalContent.querySelector("[data-profit-price-input]");
+  const resultsContainer = elements.productModalContent.querySelector("[data-profit-results]");
+
+  if (calculateButton && priceInput && resultsContainer) {
+    const runCalculation = () => {
+      const normalized = priceInput.value.trim().replace(",", ".");
+      const parsedPrice = Number.parseFloat(normalized);
+
+      if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
+        resultsContainer.innerHTML = renderSheetProfitPreview(
+          product,
+          null,
+          "Bitte einen gueltigen Verkaufspreis eingeben."
+        );
+        return;
+      }
+
+      if (!state.feeCalculatorData) {
+        resultsContainer.innerHTML = renderSheetProfitPreview(
+          product,
+          null,
+          "Bitte zuerst eine gebuehrenrechner-daten.json laden."
+        );
+        return;
+      }
+
+      const preview = calculateEbayProfitWithData(state.feeCalculatorData, {
+        salePriceGross: parsedPrice,
+        purchasePriceNet: product.purchasePriceNet,
+        categoryName: product.categoryName,
+        title: product.title,
+        weightKg: product.weightKg,
+        lengthCm: product.lengthCm,
+        widthCm: product.widthCm,
+        heightCm: product.heightCm
+      });
+
+      resultsContainer.innerHTML = renderSheetProfitPreview(product, {
+        salePriceGross: parsedPrice,
+        profitNet: preview.profitNet,
+        feeAmount: preview.feeAmount,
+        adCostNet: preview.adCostNet,
+        shippingCost: preview.shippingCost,
+        shippingTariffName: preview.shippingTariffName,
+        salePriceNet: preview.salePriceNet,
+        status: preview.status
+      });
+    };
+
+    calculateButton.addEventListener("click", runCalculation);
+    priceInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        runCalculation();
+      }
+    });
+  }
 }
 
 function renderSheetMetric(label, value) {
   return `<div class="sheet-metric"><div class="sheet-metric-label">${label}</div><div class="sheet-metric-value">${value}</div></div>`;
+}
+
+function renderSheetProfitPreview(product, preview, message) {
+  const profitDelta =
+    preview?.profitNet != null && product.ebayProfit != null ? preview.profitNet - product.ebayProfit : null;
+  const testProfit =
+    preview == null
+      ? "-"
+      : preview.profitNet == null
+        ? profitStatusLabel(preview.status)
+        : formatCurrency(preview.profitNet);
+
+  return `
+    <div class="sheet-metrics">
+      ${renderSheetMetric("Aktueller Preis", formatCurrency(product.currentPrice))}
+      ${renderSheetMetric(
+        "Aktueller Gewinn",
+        product.ebayProfit == null ? profitStatusLabel(product.profitStatus) : formatCurrency(product.ebayProfit)
+      )}
+      ${renderSheetMetric("Test-Gewinn", testProfit)}
+      ${renderSheetMetric("Differenz", profitDelta == null ? "-" : formatCurrency(profitDelta))}
+    </div>
+    ${
+      preview
+        ? `<div class="sheet-metrics sheet-profit-detail-grid">
+            ${renderSheetMetric("Netto-Verkauf", formatCurrency(preview.salePriceNet))}
+            ${renderSheetMetric("eBay Gebuehr", formatCurrency(preview.feeAmount))}
+            ${renderSheetMetric("Werbekosten netto", formatCurrency(preview.adCostNet))}
+            ${renderSheetMetric(
+              "Versand",
+              `${formatCurrency(preview.shippingCost)}${preview.shippingTariffName ? ` | ${escapeHtml(preview.shippingTariffName)}` : ""}`
+            )}
+          </div>`
+        : ""
+    }
+    ${
+      message
+        ? `<p class="sheet-profit-status">${escapeHtml(message)}</p>`
+        : !state.feeCalculatorData
+          ? `<p class="sheet-profit-status">Bitte eine <code>gebuehrenrechner-daten.json</code> laden, um lokale Gewinnvorschauen zu berechnen.</p>`
+          : `<p class="sheet-profit-status">Mit dem Testpreis laesst sich die Marge direkt im Produktdatenblatt pruefen.</p>`
+    }
+  `;
 }
 
 function getDisplayProducts() {

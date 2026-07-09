@@ -912,6 +912,70 @@ code {
   margin: 8px 0 0;
 }
 
+.sheet-profit-preview {
+  margin-top: 18px;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.86);
+  padding: 16px;
+}
+
+.sheet-profit-preview-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sheet-profit-preview-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.sheet-profit-preview-copy {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.sheet-profit-preview-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.sheet-profit-input-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.sheet-profit-input {
+  min-width: 150px;
+}
+
+.sheet-profit-results {
+  margin-top: 16px;
+}
+
+.sheet-profit-detail-grid {
+  margin-top: 12px;
+}
+
+.sheet-profit-status {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
 .sheet-metrics {
   display: grid;
   gap: 12px;
@@ -956,6 +1020,14 @@ code {
 
   .sheet-hero {
     grid-template-columns: 1fr;
+  }
+
+  .sheet-profit-preview-head {
+    align-items: stretch;
+  }
+
+  .sheet-profit-preview-controls {
+    width: 100%;
   }
 }
 
