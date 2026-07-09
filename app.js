@@ -1,10 +1,12 @@
 const storageKey = "marktoptimierer-shared-export";
+const feeStorageKey = "marktoptimierer-fee-calculator-data";
 
 const state = {
   payload: null,
+  feeCalculatorData: null,
   activeTab: "overview",
   search: "",
-  trafficFilter: "ALL",
+  trendFilter: "ALL",
   category: "ALL",
   sortField: "revenue30d",
   priceDeviation: "ALL",
@@ -17,8 +19,11 @@ const state = {
 
 const elements = {
   fileInput: document.getElementById("json-file-input"),
+  feeFileInput: document.getElementById("fee-json-file-input"),
   clearFileButton: document.getElementById("clear-file-button"),
+  clearFeeFileButton: document.getElementById("clear-fee-file-button"),
   statusMessage: document.getElementById("status-message"),
+  feeStatusMessage: document.getElementById("fee-status-message"),
   dashboardRoot: document.getElementById("dashboard-root"),
   tabButtons: Array.from(document.querySelectorAll("[data-tab]")),
   overviewPanel: document.getElementById("overview-panel"),
@@ -26,7 +31,7 @@ const elements = {
   kpiGrid: document.getElementById("kpi-grid"),
   changesKpis: document.getElementById("changes-kpis"),
   searchInput: document.getElementById("search-input"),
-  trafficFilter: document.getElementById("traffic-filter"),
+  trendFilter: document.getElementById("trend-filter"),
   categoryFilter: document.getElementById("category-filter"),
   sortField: document.getElementById("sort-field"),
   priceDeviation: document.getElementById("price-deviation"),
@@ -50,7 +55,9 @@ function bootstrap() {
 
 function wireEvents() {
   elements.fileInput.addEventListener("change", handleFileUpload);
+  elements.feeFileInput.addEventListener("change", handleFeeFileUpload);
   elements.clearFileButton.addEventListener("click", clearPayload);
+  elements.clearFeeFileButton.addEventListener("click", clearFeeCalculatorData);
 
   for (const button of elements.tabButtons) {
     button.addEventListener("click", () => {
@@ -63,8 +70,8 @@ function wireEvents() {
     state.search = event.target.value;
     render();
   });
-  elements.trafficFilter.addEventListener("change", (event) => {
-    state.trafficFilter = event.target.value;
+  elements.trendFilter.addEventListener("change", (event) => {
+    state.trendFilter = event.target.value;
     render();
   });
   elements.categoryFilter.addEventListener("change", (event) => {
@@ -114,6 +121,23 @@ function loadStoredPayload() {
   } catch {
     window.localStorage.removeItem(storageKey);
   }
+
+  try {
+    const storedFeeData = window.localStorage.getItem(feeStorageKey);
+    if (!storedFeeData) {
+      return;
+    }
+
+    const parsedFeeData = JSON.parse(storedFeeData);
+    if (!isFeeCalculatorData(parsedFeeData)) {
+      throw new Error("ungueltig");
+    }
+
+    state.feeCalculatorData = parsedFeeData;
+    setFeeStatus("Gebuehrenrechner-Datei aus dem Browser-Speicher geladen.");
+  } catch {
+    window.localStorage.removeItem(feeStorageKey);
+  }
 }
 
 async function handleFileUpload(event) {
@@ -135,6 +159,39 @@ async function handleFileUpload(event) {
     render();
   } catch (error) {
     setStatus(error instanceof Error ? error.message : "Die Datei konnte nicht geladen werden.");
+  }
+}
+
+async function handleFeeFileUpload(event) {
+  const file = event.target.files?.[0];
+  event.target.value = "";
+
+  if (!file) {
+    return;
+  }
+
+  setFeeStatus(`Lade ${file.name}...`);
+
+  try {
+    const raw = await file.text();
+    const parsed = JSON.parse(raw);
+
+    if (!isFeeCalculatorData(parsed)) {
+      throw new Error(
+        "Die Datei enthaelt nicht die erwarteten Bereiche maerkte, kategorien und versand."
+      );
+    }
+
+    state.feeCalculatorData = parsed;
+    window.localStorage.setItem(feeStorageKey, JSON.stringify(parsed));
+    setFeeStatus(`${file.name} wurde fuer lokale Gewinnberechnungen geladen.`);
+    render();
+  } catch (error) {
+    setFeeStatus(
+      error instanceof Error
+        ? error.message
+        : "Die Gebuehrenrechner-Datei konnte nicht geladen werden."
+    );
   }
 }
 
@@ -161,14 +218,26 @@ function clearPayload() {
   render();
 }
 
+function clearFeeCalculatorData() {
+  state.feeCalculatorData = null;
+  window.localStorage.removeItem(feeStorageKey);
+  setFeeStatus("Gebuehrenrechner entfernt. Die Begleitapp nutzt wieder die Werte aus dem Export.");
+  render();
+}
+
 function setStatus(message) {
   elements.statusMessage.textContent = message;
+}
+
+function setFeeStatus(message) {
+  elements.feeStatusMessage.textContent = message;
 }
 
 function render() {
   const hasPayload = Boolean(state.payload);
   elements.dashboardRoot.classList.toggle("hidden", !hasPayload);
   elements.clearFileButton.style.display = hasPayload ? "inline-flex" : "none";
+  elements.clearFeeFileButton.style.display = state.feeCalculatorData ? "inline-flex" : "none";
 
   for (const button of elements.tabButtons) {
     button.classList.toggle("is-active", button.dataset.tab === state.activeTab);
@@ -191,7 +260,10 @@ function render() {
 }
 
 function renderOverview() {
-  const products = state.payload.data.products;
+  const products = applyFeeCalculatorOverrideToProducts(
+    state.payload.data.products,
+    state.feeCalculatorData
+  );
   const baseProducts = products.filter((product) => state.showInactive || product.isActive);
   const inactiveCount = products.filter((product) => !product.isActive).length;
   const categories = Array.from(
@@ -199,10 +271,17 @@ function renderOverview() {
   ).sort((left, right) => left.localeCompare(right, "de"));
 
   syncCategoryOptions(categories);
+  elements.trendFilter.value = state.trendFilter;
 
   const filteredProducts = baseProducts
     .filter((product) => {
-      if (state.trafficFilter !== "ALL" && product.trafficLight !== state.trafficFilter) {
+      if (state.trendFilter === "POSITIVE" && !isPositiveTrendProduct(product)) {
+        return false;
+      }
+      if (state.trendFilter === "NEGATIVE" && !isNegativeTrendProduct(product)) {
+        return false;
+      }
+      if (state.trendFilter === "NO_SALES" && product.sales30d !== 0) {
         return false;
       }
       if (state.category !== "ALL" && product.categoryName !== state.category) {
@@ -240,11 +319,9 @@ function renderOverview() {
 
   const visibleKpis = {
     totalProducts: baseProducts.length,
-    greenCount: baseProducts.filter((row) => row.trafficLight === "GREEN").length,
-    yellowCount: baseProducts.filter((row) => row.trafficLight === "YELLOW").length,
-    redCount: baseProducts.filter((row) => row.trafficLight === "RED").length,
-    greyCount: baseProducts.filter((row) => row.trafficLight === "GREY").length,
-    blueCount: baseProducts.filter((row) => row.trafficLight === "BLUE").length,
+    positiveTrendCount: baseProducts.filter((row) => isPositiveTrendProduct(row)).length,
+    negativeTrendCount: baseProducts.filter((row) => isNegativeTrendProduct(row)).length,
+    noSalesCount: baseProducts.filter((row) => row.sales30d === 0).length,
     revenue30d: baseProducts.reduce((sum, row) => sum + row.revenue30d, 0),
     sales30d: baseProducts.reduce((sum, row) => sum + row.sales30d, 0),
     withoutEan: baseProducts.filter((row) => !row.ean).length,
@@ -255,6 +332,7 @@ function renderOverview() {
 
   elements.kpiGrid.innerHTML = "";
   elements.kpiGrid.append(
+    createTrendFilterCard(visibleKpis),
     createKpiCard(
       state.showInactive ? "Artikel gesamt" : "Aktive Artikel",
       formatInteger(visibleKpis.totalProducts),
@@ -263,11 +341,6 @@ function renderOverview() {
         : inactiveCount > 0
           ? `${formatInteger(inactiveCount)} inaktive Artikel ausgeblendet`
           : ""
-    ),
-    createKpiCard(
-      "Gruen / Gelb / Rot",
-      `${visibleKpis.greenCount} / ${visibleKpis.yellowCount} / ${visibleKpis.redCount}`,
-      `Grau ${visibleKpis.greyCount}, Blau ${visibleKpis.blueCount}`
     ),
     createKpiCard("Umsatz 30 Tage", formatCurrency(visibleKpis.revenue30d)),
     createKpiCard("Verkaeufe 30 Tage", formatInteger(visibleKpis.sales30d)),
@@ -319,7 +392,7 @@ function renderChanges() {
 
   if (changeInsights.length === 0) {
     const row = document.createElement("tr");
-    row.innerHTML = `<td colspan="8"><div class="empty-state">Bisher wurden noch keine Preis- oder Titel-Aenderungen erkannt.</div></td>`;
+    row.innerHTML = `<td colspan="11"><div class="empty-state">Bisher wurden noch keine Preis- oder Titel-Aenderungen erkannt.</div></td>`;
     elements.changesBody.appendChild(row);
     return;
   }
@@ -355,6 +428,41 @@ function createKpiCard(label, value, hint = "") {
     <p class="kpi-card-value">${escapeHtml(value)}</p>
     ${hint ? `<p class="kpi-card-hint">${escapeHtml(hint)}</p>` : ""}
   `;
+  return card;
+}
+
+function createTrendFilterCard(visibleKpis) {
+  const card = document.createElement("div");
+  card.className = "kpi-card trend-filter-card";
+  card.innerHTML = `
+    <p class="kpi-card-label">Trendfilter</p>
+    <div class="trend-filter-list">
+      <button class="trend-filter-button trend-positive" data-trend-filter="POSITIVE" type="button">
+        <span>Renner</span>
+        <span class="trend-filter-value">${escapeHtml(formatInteger(visibleKpis.positiveTrendCount))}</span>
+      </button>
+      <button class="trend-filter-button trend-negative" data-trend-filter="NEGATIVE" type="button">
+        <span>Penner</span>
+        <span class="trend-filter-value">${escapeHtml(formatInteger(visibleKpis.negativeTrendCount))}</span>
+      </button>
+      <button class="trend-filter-button trend-neutral" data-trend-filter="NO_SALES" type="button">
+        <span>Ohne Verkaeufe</span>
+        <span class="trend-filter-value">${escapeHtml(formatInteger(visibleKpis.noSalesCount))}</span>
+      </button>
+    </div>
+  `;
+
+  for (const button of card.querySelectorAll("[data-trend-filter]")) {
+    const value = button.dataset.trendFilter;
+    if (value === state.trendFilter) {
+      button.classList.add("is-active");
+    }
+    button.addEventListener("click", () => {
+      state.trendFilter = state.trendFilter === value ? "ALL" : value;
+      render();
+    });
+  }
+
   return card;
 }
 
@@ -502,7 +610,10 @@ function createChangeRow(entry) {
       <div>${escapeHtml(`Vorher: ${entry.beforeValue}`)}</div>
       <div class="subtle">${escapeHtml(`Nachher: ${entry.afterValue}`)}</div>
     </td>
-    <td>${escapeHtml(`${formatInteger(entry.analysisWindowDays)} Tage davor / danach`)}</td>
+    <td>
+      <div>${escapeHtml(`${formatInteger(entry.daysBefore)} Tage vorher`)}</div>
+      <div class="subtle">${escapeHtml(`${formatInteger(entry.daysAfter)} Tage nachher`)}</div>
+    </td>
     <td>
       <div>${escapeHtml(`${entry.avgSalesPerDayBefore.toFixed(2)} -> ${entry.avgSalesPerDayAfter.toFixed(2)}`)}</div>
       <div class="subtle">${escapeHtml(formatChangeDelta(entry.salesDeltaPercent))}</div>
@@ -511,10 +622,36 @@ function createChangeRow(entry) {
       <div>${escapeHtml(`${formatCurrency(entry.avgRevenuePerDayBefore)} -> ${formatCurrency(entry.avgRevenuePerDayAfter)}`)}</div>
       <div class="subtle">${escapeHtml(formatChangeDelta(entry.revenueDeltaPercent))}</div>
     </td>
-    <td><span class="change-result ${changeOutcomeClassName(entry.outcome)}">${escapeHtml(changeOutcomeLabel(entry.outcome))}</span></td>
+    <td>
+      <div>${escapeHtml(`${formatCurrency(entry.contributionMarginPerDayBefore)} -> ${formatCurrency(entry.contributionMarginPerDayAfter)}`)}</div>
+      <div class="subtle">${escapeHtml(formatChangeDelta(entry.contributionMarginDeltaPercent))}</div>
+    </td>
+    <td>
+      <div>${escapeHtml(`${formatCurrency(entry.profitPerDayBefore)} -> ${formatCurrency(entry.profitPerDayAfter)}`)}</div>
+      <div class="subtle">${escapeHtml(formatChangeDelta(entry.profitDeltaPercent))}</div>
+    </td>
+    <td>${escapeHtml(pricePositionLabel(entry.pricePosition))}</td>
+    <td>
+      <span class="change-result ${changeOutcomeClassName(entry.outcome)}">${escapeHtml(changeOutcomeLabel(entry.outcome))}</span>
+      <div class="change-action-wrap">
+        <span class="change-result ${recommendedActionClassName(entry.recommendedAction)}">${escapeHtml(recommendedActionLabel(entry.recommendedAction))}</span>
+      </div>
+    </td>
     <td>${escapeHtml(entry.recommendation)}</td>
   `;
   return row;
+}
+
+function isPositiveTrendProduct(product) {
+  return (
+    product.sales30d > 0 &&
+    (product.salesVelocity?.trendDirection === "UP" ||
+      product.salesVelocity?.trendDirection === "NEW")
+  );
+}
+
+function isNegativeTrendProduct(product) {
+  return product.sales30d > 0 && product.salesVelocity?.trendDirection === "DOWN";
 }
 
 function renderTrafficLight(light) {
@@ -565,6 +702,260 @@ function renderProfit(product) {
 
   const className = product.ebayProfit >= 0 ? "positive" : "negative";
   return `<div class="${className}">${escapeHtml(formatCurrency(product.ebayProfit))}</div>`;
+}
+
+function isFeeCalculatorData(value) {
+  return (
+    !!value &&
+    typeof value === "object" &&
+    Array.isArray(value.maerkte) &&
+    !!value.kategorien &&
+    typeof value.kategorien === "object" &&
+    !Array.isArray(value.kategorien) &&
+    Array.isArray(value.versand)
+  );
+}
+
+function applyFeeCalculatorOverrideToProducts(products, feeCalculatorData) {
+  if (!feeCalculatorData) {
+    return products;
+  }
+
+  return products.map((product) => {
+    const estimate = calculateEbayProfitWithData(feeCalculatorData, {
+      salePriceGross: product.currentPrice,
+      purchasePriceNet: product.purchasePriceNet,
+      categoryName: product.categoryName,
+      title: product.title,
+      weightKg: product.weightKg,
+      lengthCm: product.lengthCm,
+      widthCm: product.widthCm,
+      heightCm: product.heightCm
+    });
+
+    return {
+      ...product,
+      ebayProfit: estimate.profitNet,
+      ebayFee: estimate.feeAmount,
+      shippingCost: estimate.shippingCost,
+      shippingTariffName: estimate.shippingTariffName,
+      profitStatus: estimate.status
+    };
+  });
+}
+
+function calculateEbayProfitWithData(feeCalculatorData, input) {
+  const context = readCalculatorContext(feeCalculatorData);
+  const vatRate = input.vatRate ?? 0.19;
+  const adRate = input.adRate ?? 0.02;
+  const salePriceNet = roundTo(input.salePriceGross / (1 + vatRate), 2);
+  const adCostNet = roundTo((input.salePriceGross * adRate) / (1 + vatRate), 2);
+  const categoryKey = resolveCalculatorCategory(
+    context.categoryConfigs,
+    input.categoryName,
+    input.title
+  );
+  const feeAmount = roundTo(calculateEbayFee(context, input.salePriceGross, categoryKey), 2);
+
+  if (
+    input.weightKg == null ||
+    input.lengthCm == null ||
+    input.widthCm == null ||
+    input.heightCm == null ||
+    input.weightKg <= 0 ||
+    input.lengthCm <= 0 ||
+    input.widthCm <= 0 ||
+    input.heightCm <= 0
+  ) {
+    return {
+      status: "MISSING_DIMENSIONS",
+      profitNet: null,
+      feeAmount,
+      shippingCost: null,
+      shippingTariffName: null,
+      categoryKey,
+      adCostNet,
+      salePriceNet
+    };
+  }
+
+  const shippingTariff = selectBestShippingTariff(context.shippingTariffs, input);
+  if (!shippingTariff) {
+    return {
+      status: "NO_SHIPPING_TARIFF",
+      profitNet: null,
+      feeAmount,
+      shippingCost: null,
+      shippingTariffName: null,
+      categoryKey,
+      adCostNet,
+      salePriceNet
+    };
+  }
+
+  const shippingCost = roundTo(shippingTariff.preis ?? 0, 2);
+
+  if (input.purchasePriceNet == null || input.purchasePriceNet <= 0) {
+    return {
+      status: "MISSING_PURCHASE_PRICE",
+      profitNet: null,
+      feeAmount,
+      shippingCost,
+      shippingTariffName: shippingTariff.name,
+      categoryKey,
+      adCostNet,
+      salePriceNet
+    };
+  }
+
+  return {
+    status: "OK",
+    profitNet: roundTo(
+      salePriceNet - input.purchasePriceNet - feeAmount - shippingCost - adCostNet,
+      2
+    ),
+    feeAmount,
+    shippingCost,
+    shippingTariffName: shippingTariff.name,
+    categoryKey,
+    adCostNet,
+    salePriceNet
+  };
+}
+
+function readCalculatorContext(feeCalculatorData) {
+  return {
+    markets: feeCalculatorData.maerkte,
+    categoryConfigs: feeCalculatorData.kategorien,
+    shippingTariffs: feeCalculatorData.versand.map((tariff) => ({
+      ...tariff,
+      preis: calculateShippingPrice(tariff)
+    }))
+  };
+}
+
+function calculateShippingPrice(tariff) {
+  let sum = tariff.grundpreis ?? 0;
+
+  if (tariff.versichert) {
+    sum += tariff.versicherung ?? 0;
+  }
+  if (tariff.treibstoff_prozent) {
+    sum += (tariff.grundpreis ?? 0) * tariff.treibstoff_prozent;
+  }
+
+  sum += tariff.treibstoff_euro ?? 0;
+  sum += tariff.co2 ?? 0;
+  sum += tariff.palettenkosten ?? 0;
+  sum += tariff.sonstige ?? 0;
+
+  return roundTo(sum, 2);
+}
+
+function selectBestShippingTariff(shippingTariffs, input) {
+  return (
+    [...shippingTariffs]
+      .filter((tariff) => {
+        const volumetricWeight = tariff.divisor
+          ? Math.ceil((input.lengthCm * input.widthCm * input.heightCm) / tariff.divisor)
+          : 0;
+        const effectiveWeight = Math.max(input.weightKg, volumetricWeight, tariff.volumen ?? 0);
+
+        if (effectiveWeight > (tariff.gewicht ?? 0)) {
+          return false;
+        }
+
+        return (
+          input.lengthCm <= (tariff.l ?? 0) &&
+          input.widthCm <= (tariff.b ?? 0) &&
+          input.heightCm <= (tariff.h ?? 0)
+        );
+      })
+      .sort((left, right) => (left.preis ?? 0) - (right.preis ?? 0))[0] ?? null
+  );
+}
+
+function calculateEbayFee(context, salePriceGross, categoryKey) {
+  const category = categoryKey ? context.categoryConfigs[categoryKey] ?? null : null;
+  const ebayMarket = context.markets.find((market) => market.ebay) ?? null;
+  const firstRate = category?.ebay_satz1 ?? category?.ebay ?? ebayMarket?.over ?? 0;
+  const threshold = category?.ebay_grenze ?? category?.max ?? ebayMarket?.max ?? 0;
+  const secondRate = category?.ebay_satz2 ?? category?.over ?? ebayMarket?.over ?? firstRate;
+  const fixedFee = category?.ebay_fix ?? ebayMarket?.fix ?? 0;
+
+  if (threshold <= 0 || salePriceGross <= threshold) {
+    return salePriceGross * firstRate + fixedFee;
+  }
+
+  return threshold * firstRate + (salePriceGross - threshold) * secondRate + fixedFee;
+}
+
+function resolveCalculatorCategory(categoryConfigs, categoryName, title) {
+  const defaultCategory = findCategoryKey(categoryConfigs, ["haushaltsgerate"]);
+  if (!categoryName?.trim()) {
+    return defaultCategory;
+  }
+
+  const exactMatch = findExactCategory(categoryConfigs, categoryName);
+  if (exactMatch) {
+    return exactMatch;
+  }
+
+  const haystack = normalizeText(`${categoryName ?? ""} ${title ?? ""}`);
+  const mappings = [
+    { category: findCategoryKey(categoryConfigs, ["haushaltsgerate klein"]), keywords: ["filter", "kaffee", "wasserkocher", "toaster", "fritteuse"] },
+    { category: findCategoryKey(categoryConfigs, ["haushaltsgerate"]), keywords: ["wasch", "trock", "kuhl", "gefrier", "spul", "herd", "backofen", "mikrowelle", "haushalt"] },
+    { category: findCategoryKey(categoryConfigs, ["heimwerker"]), keywords: ["werkzeug", "bohr", "schrauber", "sage", "akku", "kompressor"] },
+    { category: findCategoryKey(categoryConfigs, ["garten"]), keywords: ["garten", "rasen", "hecke", "terrasse"] },
+    { category: findCategoryKey(categoryConfigs, ["spielzeug"]), keywords: ["spielzeug", "lego", "puppe", "baustein"] },
+    { category: findCategoryKey(categoryConfigs, ["sport"]), keywords: ["sport", "fitness", "fahrrad"] },
+    { category: findCategoryKey(categoryConfigs, ["elektronik"]), keywords: ["audio", "tv", "fernseher", "kamera", "elektronik"] },
+    { category: findCategoryKey(categoryConfigs, ["computer"]), keywords: ["computer", "notebook", "laptop", "tablet", "drucker", "monitor"] },
+    { category: findCategoryKey(categoryConfigs, ["mobel"]), keywords: ["mobel", "wohnen", "schrank", "sofa", "bett"] },
+    { category: findCategoryKey(categoryConfigs, ["haustierbedarf"]), keywords: ["haustier", "tierbedarf", "katze", "hund"] },
+    { category: findCategoryKey(categoryConfigs, ["lebensmittel"]), keywords: ["lebensmittel", "nahrung", "getrank"] },
+    { category: findCategoryKey(categoryConfigs, ["drogerie"]), keywords: ["drogerie", "kosmetik", "beauty", "pflege", "gesundheit"] },
+    { category: findCategoryKey(categoryConfigs, ["auto", "motorrad"]), keywords: ["auto", "motorrad", "reifen"] },
+    { category: findCategoryKey(categoryConfigs, ["bekleidung"]), keywords: ["bekleidung", "jacke", "hose", "shirt"] },
+    { category: findCategoryKey(categoryConfigs, ["schuhe"]), keywords: ["schuh", "sneaker", "stiefel"] },
+    { category: findCategoryKey(categoryConfigs, ["accessoires"]), keywords: ["accessoire", "tasche", "rucksack", "gurtel"] },
+    { category: findCategoryKey(categoryConfigs, ["bucher"]), keywords: ["buch", "roman", "kalender"] },
+    { category: findCategoryKey(categoryConfigs, ["filme", "musik"]), keywords: ["film", "musik", "dvd", "blu", "vinyl", "cd"] },
+    { category: findCategoryKey(categoryConfigs, ["burobedarf"]), keywords: ["buro", "office", "ordner", "papier"] }
+  ];
+
+  for (const mapping of mappings) {
+    if (mapping.category && mapping.keywords.some((keyword) => haystack.includes(keyword))) {
+      return mapping.category;
+    }
+  }
+
+  return defaultCategory ?? findCategoryKey(categoryConfigs, ["sonstiges"]);
+}
+
+function findExactCategory(categoryConfigs, categoryName) {
+  if (!categoryName) {
+    return null;
+  }
+
+  const normalizedCategoryName = normalizeText(categoryName);
+  return Object.keys(categoryConfigs).find((key) => normalizeText(key) === normalizedCategoryName) ?? null;
+}
+
+function findCategoryKey(categoryConfigs, keywords) {
+  return (
+    Object.keys(categoryConfigs).find((key) => {
+      const normalizedKey = normalizeText(key);
+      return keywords.every((keyword) => normalizedKey.includes(keyword));
+    }) ?? null
+  );
+}
+
+function normalizeText(value) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
 }
 
 function sortProducts(left, right, sortField) {
@@ -756,6 +1147,49 @@ function changeOutcomeClassName(outcome) {
   }
 }
 
+function recommendedActionLabel(action) {
+  switch (action) {
+    case "KEEP":
+      return "Preis beibehalten";
+    case "RAISE":
+      return "Preis erhoehen";
+    case "LOWER":
+      return "Preis senken";
+    case "RETEST":
+      return "Erneut testen";
+    default:
+      return "Beobachten";
+  }
+}
+
+function recommendedActionClassName(action) {
+  switch (action) {
+    case "KEEP":
+      return "positive";
+    case "RAISE":
+      return "info";
+    case "LOWER":
+      return "negative";
+    case "RETEST":
+      return "too-early";
+    default:
+      return "neutral";
+  }
+}
+
+function pricePositionLabel(position) {
+  switch (position) {
+    case "LIKELY_TOO_LOW":
+      return "Vermutlich zu niedrig";
+    case "LIKELY_TOO_HIGH":
+      return "Vermutlich zu hoch";
+    case "LIKELY_MARKET":
+      return "Vermutlich marktgerecht";
+    default:
+      return "Noch unklar";
+  }
+}
+
 function trendLabel(value) {
   switch (value) {
     case "UP":
@@ -849,6 +1283,11 @@ function formatDateTime(value) {
     dateStyle: "medium",
     timeStyle: "short"
   }).format(new Date(value));
+}
+
+function roundTo(value, digits) {
+  const factor = 10 ** digits;
+  return Math.round(value * factor) / factor;
 }
 
 function shorten(value, maxLength) {

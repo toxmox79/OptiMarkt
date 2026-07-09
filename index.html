@@ -31,9 +31,17 @@
             JSON laden
             <input id="json-file-input" accept=".json,application/json" class="hidden-input" type="file" />
           </label>
+          <label class="secondary-button">
+            Gebuehrenrechner laden
+            <input id="fee-json-file-input" accept=".json,application/json" class="hidden-input" type="file" />
+          </label>
           <button id="clear-file-button" class="secondary-button" type="button">Datei entfernen</button>
+          <button id="clear-fee-file-button" class="secondary-button" type="button">Gebuehrenrechner entfernen</button>
         </div>
         <p id="status-message" class="status-message">Bitte eine exportierte JSON-Datei laden.</p>
+        <p id="fee-status-message" class="status-message">
+          Optional kann eine gebuehrenrechner-daten.json fuer lokale Gewinnberechnungen geladen werden.
+        </p>
       </section>
 
       <section id="dashboard-root" class="dashboard-root hidden">
@@ -48,13 +56,11 @@
           <section class="panel">
             <div class="filters-grid">
               <input id="search-input" class="field" placeholder="Suche nach Plenty ItemID, SKU, EAN, Titel" />
-              <select id="traffic-filter" class="field">
-                <option value="ALL">Alle Ampeln</option>
-                <option value="GREEN">Gruen</option>
-                <option value="YELLOW">Gelb</option>
-                <option value="RED">Rot</option>
-                <option value="GREY">Grau</option>
-                <option value="BLUE">Blau</option>
+              <select id="trend-filter" class="field">
+                <option value="ALL">Alle Trends</option>
+                <option value="POSITIVE">Renner</option>
+                <option value="NEGATIVE">Penner</option>
+                <option value="NO_SALES">Ohne Verkaeufe</option>
               </select>
               <select id="category-filter" class="field">
                 <option value="ALL">Alle Kategorien</option>
@@ -83,9 +89,7 @@
             </div>
 
             <p id="overview-count" class="muted-text"></p>
-            <p class="scroll-hint">
-              Falls rechts noch Spalten fehlen, bitte im Tabellenbereich horizontal scrollen.
-            </p>
+            <p class="scroll-hint">Im Tabellenbereich kann horizontal und vertikal gescrollt werden.</p>
 
             <div class="table-scroll">
               <table class="data-table">
@@ -160,6 +164,9 @@
                   <col class="change-col-window" />
                   <col class="change-col-sales" />
                   <col class="change-col-revenue" />
+                  <col class="change-col-margin" />
+                  <col class="change-col-profit" />
+                  <col class="change-col-position" />
                   <col class="change-col-result" />
                   <col class="change-col-recommendation" />
                 </colgroup>
@@ -168,9 +175,12 @@
                     <th>Artikel</th>
                     <th>Aenderung</th>
                     <th>Vorher / Nachher</th>
-                    <th>Fenster</th>
+                    <th>Gueltigkeit</th>
                     <th>Sales/Tag</th>
                     <th>Umsatz/Tag</th>
+                    <th>DB/Tag</th>
+                    <th>Gewinn/Tag</th>
+                    <th>Preisniveau</th>
                     <th>Ergebnis</th>
                     <th>Empfehlung</th>
                   </tr>
