@@ -337,6 +337,10 @@ select {
   min-width: 1280px;
 }
 
+.first-sale-table {
+  min-width: 1620px;
+}
+
 .data-table th {
   position: sticky;
   top: 0;
@@ -694,6 +698,10 @@ select {
 
 .change-col-recommendation {
   width: 270px;
+}
+
+.first-sale-filters {
+  margin-top: 18px;
 }
 
 .change-action-wrap {

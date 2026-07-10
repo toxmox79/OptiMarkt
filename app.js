@@ -6,6 +6,8 @@ const state = {
   feeCalculatorData: null,
   selectedProductId: null,
   activeTab: "overview",
+  firstSaleListingSort: "START_DESC",
+  firstSaleMode: "ALL",
   search: "",
   trendFilter: "ALL",
   category: "ALL",
@@ -15,6 +17,7 @@ const state = {
   onlyWithoutEan: false,
   onlyZeroSales: false,
   excludeBWare: false,
+  excludeBWareInFirstSaleStats: true,
   showInactive: false
 };
 
@@ -32,8 +35,10 @@ const elements = {
   productModalContent: document.getElementById("product-modal-content"),
   tabButtons: Array.from(document.querySelectorAll("[data-tab]")),
   overviewPanel: document.getElementById("overview-panel"),
+  firstSalePanel: document.getElementById("first-sale-panel"),
   changesPanel: document.getElementById("changes-panel"),
   kpiGrid: document.getElementById("kpi-grid"),
+  firstSaleKpis: document.getElementById("first-sale-kpis"),
   changesKpis: document.getElementById("changes-kpis"),
   searchInput: document.getElementById("search-input"),
   trendFilter: document.getElementById("trend-filter"),
@@ -44,9 +49,13 @@ const elements = {
   withoutEan: document.getElementById("without-ean"),
   zeroSales: document.getElementById("zero-sales"),
   excludeBware: document.getElementById("exclude-bware"),
+  firstSaleExcludeBware: document.getElementById("first-sale-exclude-bware"),
+  firstSaleListingSort: document.getElementById("first-sale-listing-sort"),
+  firstSaleMode: document.getElementById("first-sale-mode"),
   showInactive: document.getElementById("show-inactive"),
   overviewCount: document.getElementById("overview-count"),
   overviewBody: document.getElementById("overview-body"),
+  firstSaleBody: document.getElementById("first-sale-body"),
   changesBody: document.getElementById("changes-body")
 };
 
@@ -107,6 +116,18 @@ function wireEvents() {
   });
   elements.excludeBware.addEventListener("change", (event) => {
     state.excludeBWare = event.target.checked;
+    render();
+  });
+  elements.firstSaleExcludeBware.addEventListener("change", (event) => {
+    state.excludeBWareInFirstSaleStats = event.target.checked;
+    render();
+  });
+  elements.firstSaleListingSort.addEventListener("change", (event) => {
+    state.firstSaleListingSort = event.target.value;
+    render();
+  });
+  elements.firstSaleMode.addEventListener("change", (event) => {
+    state.firstSaleMode = event.target.value;
     render();
   });
   elements.showInactive.addEventListener("change", (event) => {
@@ -251,12 +272,15 @@ function render() {
   }
 
   elements.overviewPanel.classList.toggle("hidden", state.activeTab !== "overview");
+  elements.firstSalePanel.classList.toggle("hidden", state.activeTab !== "first-sale");
   elements.changesPanel.classList.toggle("hidden", state.activeTab !== "changes");
 
   if (!hasPayload) {
     elements.kpiGrid.innerHTML = "";
+    elements.firstSaleKpis.innerHTML = "";
     elements.changesKpis.innerHTML = "";
     elements.overviewBody.innerHTML = "";
+    elements.firstSaleBody.innerHTML = "";
     elements.changesBody.innerHTML = "";
     elements.overviewCount.textContent = "";
     elements.productModal.classList.add("hidden");
@@ -264,6 +288,7 @@ function render() {
   }
 
   renderOverview();
+  renderFirstSale();
   renderChanges();
   renderProductModal();
 }
@@ -405,6 +430,65 @@ function renderChanges() {
 
   for (const entry of changeInsights) {
     elements.changesBody.appendChild(createChangeRow(entry));
+  }
+}
+
+function renderFirstSale() {
+  const rawStats = state.payload?.data?.firstSaleStats ?? buildEmptyFirstSaleStatistics();
+  const visibleStats = state.excludeBWareInFirstSaleStats
+    ? filterFirstSaleStatistics(rawStats)
+    : rawStats;
+  const visibleEntries = buildVisibleFirstSaleEntries(
+    visibleStats.entries,
+    state.firstSaleListingSort,
+    state.firstSaleMode
+  );
+
+  elements.firstSaleExcludeBware.checked = state.excludeBWareInFirstSaleStats;
+  elements.firstSaleListingSort.value = state.firstSaleListingSort;
+  elements.firstSaleMode.value = state.firstSaleMode;
+
+  elements.firstSaleKpis.innerHTML = "";
+  elements.firstSaleKpis.append(
+    createKpiCard(
+      "Neues Listing bis Erstverkauf",
+      formatLatencySummaryValue(visibleStats.listingStart),
+      formatLatencySummaryHint(visibleStats.listingStart)
+    ),
+    createKpiCard(
+      "Preiswechsel bis naechster Verkauf",
+      formatDurationMetric(visibleStats.priceChange.averageDays),
+      formatLatencySummaryHint(visibleStats.priceChange)
+    ),
+    createKpiCard(
+      "Titelwechsel bis naechster Verkauf",
+      formatDurationMetric(visibleStats.titleChange.averageDays),
+      formatLatencySummaryHint(visibleStats.titleChange)
+    ),
+    createKpiCard(
+      "Listing-Update bis naechster Verkauf",
+      formatDurationMetric(visibleStats.listingUpdate.averageDays),
+      formatLatencySummaryHint(visibleStats.listingUpdate)
+    ),
+    createKpiCard(
+      "Neue Listings ohne Verkauf",
+      formatInteger(visibleStats.listingStart.pendingCount),
+      `${formatInteger(visibleStats.listingStart.completedCount)} abgeschlossene neue Listings`
+    )
+  );
+
+  elements.firstSaleBody.innerHTML = "";
+
+  if (visibleEntries.length === 0) {
+    const row = document.createElement("tr");
+    row.innerHTML =
+      '<td colspan="10"><div class="empty-state">Fuer diese Ansicht liegen aktuell noch keine belastbaren Listing- oder Verkaufszeitpunkte vor.</div></td>';
+    elements.firstSaleBody.appendChild(row);
+    return;
+  }
+
+  for (const entry of visibleEntries) {
+    elements.firstSaleBody.appendChild(createFirstSaleRow(entry));
   }
 }
 
@@ -582,25 +666,42 @@ function createOverviewRow(product) {
     </td>
   `;
 
-  for (const button of row.querySelectorAll("[data-copy-item-id]")) {
-    button.addEventListener("click", async () => {
-      const value = button.dataset.copyItemId;
-      try {
-        await navigator.clipboard.writeText(value);
-        setStatus(`Plenty ItemID ${value} wurde in die Zwischenablage kopiert.`);
-      } catch {
-        setStatus("Die ItemID konnte nicht in die Zwischenablage kopiert werden.");
-      }
-    });
-  }
+  wireCopyAndOpenHandlers(row);
+  return row;
+}
 
-  for (const trigger of row.querySelectorAll("[data-open-product]")) {
-    trigger.addEventListener("click", () => {
-      state.selectedProductId = trigger.dataset.openProduct;
-      renderProductModal();
-    });
-  }
+function createFirstSaleRow(entry) {
+  const row = document.createElement("tr");
+  row.className = "data-row";
+  const itemIdButton = entry.plentyItemId
+    ? `<button class="item-id-button" data-copy-item-id="${escapeAttribute(entry.plentyItemId)}" type="button">ID ${escapeHtml(entry.plentyItemId)}</button>`
+    : "";
 
+  row.innerHTML = `
+    <td>
+      <div class="change-layout">
+        <div class="change-image product-image" data-open-product="${escapeAttribute(entry.productId)}">
+          ${entry.imageUrl ? `<img alt="${escapeAttribute(entry.title)}" src="${escapeAttribute(entry.imageUrl)}" />` : ""}
+        </div>
+        <div>
+          <p class="change-title">${escapeHtml(entry.title)}</p>
+          <p class="change-subline">${escapeHtml(entry.sku ?? "ohne SKU")} | ${escapeHtml(entry.ean ?? "ohne EAN")}</p>
+          ${itemIdButton}
+        </div>
+      </div>
+    </td>
+    <td>${escapeHtml(formatDate(entry.listingStartAt))}</td>
+    <td>${escapeHtml(formatDate(entry.firstSaleAfterListingStartAt))}</td>
+    <td>${renderLatencyCell(entry.daysToFirstSale, entry.pendingListingStartDays)}</td>
+    <td>${escapeHtml(formatDate(entry.priceChangedAt))}</td>
+    <td>${renderLatencyEventCell(entry.daysFromPriceChangeToSale, entry.pendingPriceChangeDays, entry.firstSaleAfterPriceChangeAt)}</td>
+    <td>${escapeHtml(formatDate(entry.titleChangedAt))}</td>
+    <td>${renderLatencyEventCell(entry.daysFromTitleChangeToSale, entry.pendingTitleChangeDays, entry.firstSaleAfterTitleChangeAt)}</td>
+    <td>${escapeHtml(formatDate(entry.listingUpdatedAt))}</td>
+    <td>${renderLatencyEventCell(entry.daysFromListingUpdateToSale, entry.pendingListingUpdateDays, entry.firstSaleAfterListingUpdateAt)}</td>
+  `;
+
+  wireCopyAndOpenHandlers(row);
   return row;
 }
 
@@ -783,6 +884,27 @@ function renderSheetMetric(label, value) {
   return `<div class="sheet-metric"><div class="sheet-metric-label">${label}</div><div class="sheet-metric-value">${value}</div></div>`;
 }
 
+function wireCopyAndOpenHandlers(container) {
+  for (const button of container.querySelectorAll("[data-copy-item-id]")) {
+    button.addEventListener("click", async () => {
+      const value = button.dataset.copyItemId;
+      try {
+        await navigator.clipboard.writeText(value);
+        setStatus(`Plenty ItemID ${value} wurde in die Zwischenablage kopiert.`);
+      } catch {
+        setStatus("Die ItemID konnte nicht in die Zwischenablage kopiert werden.");
+      }
+    });
+  }
+
+  for (const trigger of container.querySelectorAll("[data-open-product]")) {
+    trigger.addEventListener("click", () => {
+      state.selectedProductId = trigger.dataset.openProduct;
+      renderProductModal();
+    });
+  }
+}
+
 function renderSheetProfitPreview(product, preview, message) {
   const profitDelta =
     preview?.profitNet != null && product.ebayProfit != null ? preview.profitNet - product.ebayProfit : null;
@@ -824,6 +946,174 @@ function renderSheetProfitPreview(product, preview, message) {
           : `<p class="sheet-profit-status">Mit dem Testpreis laesst sich die Marge direkt im Produktdatenblatt pruefen.</p>`
     }
   `;
+}
+
+function buildEmptyFirstSaleStatistics() {
+  return {
+    entries: [],
+    listingStart: buildEmptyFirstSaleSummary(),
+    priceChange: buildEmptyFirstSaleSummary(),
+    titleChange: buildEmptyFirstSaleSummary(),
+    listingUpdate: buildEmptyFirstSaleSummary()
+  };
+}
+
+function buildEmptyFirstSaleSummary() {
+  return {
+    totalTracked: 0,
+    completedCount: 0,
+    pendingCount: 0,
+    averageDays: null,
+    medianDays: null,
+    fastestDays: null,
+    slowestDays: null
+  };
+}
+
+function filterFirstSaleStatistics(firstSaleStats) {
+  const entries = firstSaleStats.entries.filter((entry) => !hasBracketInTitle(entry.title));
+  return {
+    entries,
+    listingStart: summarizeFirstSaleEntries(entries, "listingStartAt", "daysToFirstSale", "pendingListingStartDays"),
+    priceChange: summarizeFirstSaleEntries(entries, "priceChangedAt", "daysFromPriceChangeToSale", "pendingPriceChangeDays"),
+    titleChange: summarizeFirstSaleEntries(entries, "titleChangedAt", "daysFromTitleChangeToSale", "pendingTitleChangeDays"),
+    listingUpdate: summarizeFirstSaleEntries(entries, "listingUpdatedAt", "daysFromListingUpdateToSale", "pendingListingUpdateDays")
+  };
+}
+
+function summarizeFirstSaleEntries(entries, eventKey, completedKey, pendingKey) {
+  const trackedEntries = entries.filter((entry) => entry[eventKey] != null);
+  const completedValues = trackedEntries
+    .map((entry) => entry[completedKey])
+    .filter((value) => value != null)
+    .sort((left, right) => left - right);
+  const pendingCount = trackedEntries.filter((entry) => entry[pendingKey] != null).length;
+
+  return {
+    totalTracked: trackedEntries.length,
+    completedCount: completedValues.length,
+    pendingCount,
+    averageDays:
+      completedValues.length > 0
+        ? roundTo(completedValues.reduce((sum, value) => sum + value, 0) / completedValues.length, 1)
+        : null,
+    medianDays: calculateMedianDays(completedValues),
+    fastestDays: completedValues[0] ?? null,
+    slowestDays: completedValues.length > 0 ? completedValues[completedValues.length - 1] : null
+  };
+}
+
+function calculateMedianDays(values) {
+  if (values.length === 0) {
+    return null;
+  }
+
+  const middle = Math.floor(values.length / 2);
+  if (values.length % 2 === 1) {
+    return values[middle] ?? null;
+  }
+
+  return roundTo(((values[middle - 1] ?? 0) + (values[middle] ?? 0)) / 2, 1);
+}
+
+function buildVisibleFirstSaleEntries(entries, listingSort, mode) {
+  let visibleEntries = [...entries];
+
+  if (mode === "OPEN") {
+    visibleEntries = visibleEntries.filter(
+      (entry) => entry.daysToFirstSale == null && entry.pendingListingStartDays != null
+    );
+  }
+
+  visibleEntries.sort((left, right) => {
+    if (mode === "FIRST_SALE_DAYS") {
+      const leftPending = left.daysToFirstSale == null ? 1 : 0;
+      const rightPending = right.daysToFirstSale == null ? 1 : 0;
+
+      if (leftPending !== rightPending) {
+        return leftPending - rightPending;
+      }
+
+      if (left.daysToFirstSale != null && right.daysToFirstSale != null) {
+        const daysDifference = left.daysToFirstSale - right.daysToFirstSale;
+        if (daysDifference !== 0) {
+          return daysDifference;
+        }
+      }
+    }
+
+    const leftStart = left.listingStartAt ? new Date(left.listingStartAt).getTime() : 0;
+    const rightStart = right.listingStartAt ? new Date(right.listingStartAt).getTime() : 0;
+    return listingSort === "START_ASC" ? leftStart - rightStart : rightStart - leftStart;
+  });
+
+  return visibleEntries;
+}
+
+function formatDurationMetric(value) {
+  if (value == null) {
+    return "-";
+  }
+
+  return `${Number(value).toFixed(1).replace(".", ",")} Tage`;
+}
+
+function formatLatencySummaryValue(summary) {
+  if (summary.totalTracked === 0) {
+    return "-";
+  }
+
+  return `${formatInteger(summary.completedCount)} / ${formatInteger(summary.totalTracked)}`;
+}
+
+function formatLatencySummaryHint(summary) {
+  if (summary.totalTracked === 0) {
+    return "Noch keine auswertbaren Daten vorhanden";
+  }
+
+  const parts = [`Ø ${formatDurationMetric(summary.averageDays)}`];
+  if (summary.medianDays != null) {
+    parts.push(`Median ${formatDurationMetric(summary.medianDays)}`);
+  }
+  if (summary.pendingCount > 0) {
+    parts.push(`${formatInteger(summary.pendingCount)} noch offen`);
+  }
+
+  return parts.join(" | ");
+}
+
+function renderLatencyCell(days, pendingDays) {
+  if (days != null) {
+    return `<span class="positive">${escapeHtml(formatDurationMetric(days))}</span>`;
+  }
+
+  if (pendingDays != null) {
+    return `<span class="too-early">${escapeHtml(`offen seit ${formatDurationMetric(pendingDays)}`)}</span>`;
+  }
+
+  return '<span class="subtle">-</span>';
+}
+
+function renderLatencyEventCell(days, pendingDays, saleAt) {
+  if (days != null) {
+    return `
+      <div>
+        <div class="positive">${escapeHtml(formatDurationMetric(days))}</div>
+        <div class="subtle" style="margin-top:4px;">Sale am ${escapeHtml(formatDate(saleAt))}</div>
+      </div>
+    `;
+  }
+
+  if (pendingDays != null) {
+    return `
+      <div>
+        <div class="too-early">${escapeHtml(`offen seit ${formatDurationMetric(pendingDays)}`)}</div>
+        <div class="subtle" style="margin-top:4px;">Bisher noch kein Verkauf nach dem Ereignis</div>
+      </div>
+    `;
+  }
+
+  return '<span class="subtle">-</span>';
 }
 
 function getDisplayProducts() {
@@ -1283,6 +1573,10 @@ function isBWareProduct(product) {
     .filter(Boolean);
 
   return titleCandidates.some((value) => /[()]/.test(value));
+}
+
+function hasBracketInTitle(value) {
+  return /[()]/.test(value ?? "");
 }
 
 function formatPriceChangeLabel(changedAt, previousValue, currentValue) {

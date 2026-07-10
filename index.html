@@ -47,6 +47,7 @@
       <section id="dashboard-root" class="dashboard-root hidden">
         <section class="tab-bar">
           <button class="tab-button is-active" data-tab="overview" type="button">Uebersicht</button>
+          <button class="tab-button" data-tab="first-sale" type="button">Erstverkauf</button>
           <button class="tab-button" data-tab="changes" type="button">Aenderungen</button>
         </section>
 
@@ -122,6 +123,67 @@
                   </tr>
                 </thead>
                 <tbody id="overview-body"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section id="first-sale-panel" class="tab-panel hidden">
+          <div id="first-sale-kpis" class="kpi-grid"></div>
+
+          <section class="panel">
+            <div class="section-header">
+              <div>
+                <h2>Zeit bis zum ersten Verkauf</h2>
+                <p>
+                  Auswertung fuer neue Listings sowie Zeitspannen nach Preis-, Titel- oder
+                  Listing-Aktualisierung bis zum naechsten Verkauf.
+                </p>
+              </div>
+            </div>
+
+            <div class="filters-row first-sale-filters">
+              <label><input id="first-sale-exclude-bware" type="checkbox" checked /> Ausstellungsstuecke / B-Ware mit Klammern ausblenden</label>
+              <select id="first-sale-listing-sort" class="pill-field">
+                <option value="START_DESC">Listing Start: absteigend</option>
+                <option value="START_ASC">Listing Start: aufsteigend</option>
+              </select>
+              <select id="first-sale-mode" class="pill-field">
+                <option value="ALL">Bis Erstverkauf: alle</option>
+                <option value="OPEN">Bis Erstverkauf: offen</option>
+                <option value="FIRST_SALE_DAYS">Bis Erstverkauf: nach Tagen des ersten Verkaufs</option>
+              </select>
+            </div>
+
+            <div class="table-scroll">
+              <table class="data-table first-sale-table">
+                <colgroup>
+                  <col class="change-col-product" />
+                  <col class="change-col-window" />
+                  <col class="change-col-window" />
+                  <col class="change-col-sales" />
+                  <col class="change-col-window" />
+                  <col class="change-col-revenue" />
+                  <col class="change-col-window" />
+                  <col class="change-col-revenue" />
+                  <col class="change-col-window" />
+                  <col class="change-col-revenue" />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>Artikel</th>
+                    <th>Listing Start</th>
+                    <th>Erster Verkauf</th>
+                    <th>Bis Erstverkauf</th>
+                    <th>Preis geaendert</th>
+                    <th>Bis naechster Verkauf</th>
+                    <th>Titel geaendert</th>
+                    <th>Bis naechster Verkauf</th>
+                    <th>Listing aktualisiert</th>
+                    <th>Bis naechster Verkauf</th>
+                  </tr>
+                </thead>
+                <tbody id="first-sale-body"></tbody>
               </table>
             </div>
           </section>
